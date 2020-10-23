@@ -17,9 +17,15 @@ module ActiveJob
 
       def enqueue(job, attributes = {})
         Concurrent::Promise.execute(executor: @executor) {
+          @logger&.info "publishing #{job.class.name} in queue #{job.queue_name}"
           @pubsub.topic_for(job.queue_name).publish JSON.dump(job.serialize), attributes
+          @logger&.info "published #{job.class.name} in queue #{job.queue_name}"
         }.rescue {|e|
-          @logger&.error e
+          if @logger.nil?
+            STDERR.puts e
+          else
+            @logger&.error e
+          end
         }
       end
 
