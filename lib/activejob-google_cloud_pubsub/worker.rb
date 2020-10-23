@@ -26,7 +26,11 @@ module ActiveJob
 
         subscriber = @pubsub.subscription_for(@queue_name).listen(streams: 1, threads: { callback: 1 }) do |message|
           @logger&.info "Message(#{message.message_id}) was received."
-          process message
+          if message.time_to_process?
+            process message
+          else
+            @logger&.info "Message(#{message.message_id}) is scheduled for later, skipping."
+          end
         end
 
         subscriber.on_error do |error|
