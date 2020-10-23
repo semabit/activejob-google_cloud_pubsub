@@ -9,8 +9,6 @@ require 'logger'
 module ActiveJob
   module GoogleCloudPubsub
     class Worker
-      MAX_DEADLINE = 10.minutes
-
       using PubsubExtension
 
       def initialize(queue: 'default', min_threads: 0, max_threads: Concurrent.processor_count, pubsub: Google::Cloud::Pubsub.new, logger: Logger.new($stdout))
@@ -19,6 +17,7 @@ module ActiveJob
         @max_threads = max_threads
         @pubsub = pubsub
         @logger = logger
+        @ack_deadline_seconds = 60
       end
 
       def run
@@ -29,13 +28,15 @@ module ActiveJob
           if message.time_to_process?
             process message
           else
-            @logger&.info "Message(#{message.message_id}) is scheduled for later, skipping."
+            @logger&.info "Message(#{message.message_id}) is scheduled for later (#{message.scheduled_at}), skipping."
           end
         end
 
         subscriber.on_error do |error|
           @logger&.error(error)
         end
+
+        @ack_deadline_seconds = subscriber.deadline
 
         subscriber.start
 
@@ -55,13 +56,14 @@ module ActiveJob
 
       def process(message)
         timer_opts = {
-          execution_interval: MAX_DEADLINE - 10.seconds,
+          # Extend ack deadline when only 10% of allowed time or 5 seconds are left, whichever comes first
+          execution_interval: [(@ack_deadline_seconds * 0.9).round, @ack_deadline_seconds - 5].min.seconds,
           timeout_interval: 5.seconds,
           run_now: true
         }
 
         delay_timer = Concurrent::TimerTask.execute(timer_opts) {
-          message.modify_ack_deadline! MAX_DEADLINE.to_i
+          message.modify_ack_deadline! @ack_deadline_seconds.to_i
         }
 
         begin
