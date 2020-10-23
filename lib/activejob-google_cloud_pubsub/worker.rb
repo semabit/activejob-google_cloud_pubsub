@@ -21,7 +21,7 @@ module ActiveJob
       end
 
       def run
-        @logger&.info "Google Pub/Sub Worker running - min_threads: #{@min_threads.to_i}, max_threads: #{@max_threads.to_i}"
+        @logger&.info "Google Pub/Sub Worker running (queue: #{@queue_name})"
 
         subscriber = @pubsub.subscription_for(@queue_name).listen(streams: 1, threads: { callback: 1 }) do |message|
           @logger&.info "Message(#{message.message_id}) was received."
@@ -42,7 +42,7 @@ module ActiveJob
 
         while true
           sleep 5
-          @logger&.info "Google Pub/Sub Worker is alive"
+          @logger&.info "Google Pub/Sub Worker is alive (queue: #{@queue_name})"
         end
       end
 
