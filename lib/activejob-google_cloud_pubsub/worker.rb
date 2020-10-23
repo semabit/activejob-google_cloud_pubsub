@@ -22,6 +22,7 @@ module ActiveJob
       end
 
       def run
+        @logger&.info "Google Pub/Sub Worker running - min_threads: #{@min_threads.to_i}, max_threads: #{@max_threads.to_i}"
         pool = Concurrent::ThreadPoolExecutor.new(min_threads: @min_threads, max_threads: @max_threads, max_queue: -1)
 
         @pubsub.subscription_for(@queue_name).listen {|message|
@@ -44,7 +45,10 @@ module ActiveJob
           end
         }.start
 
-        sleep
+        while true
+          sleep 5
+          @logger&.info "Google Pub/Sub Worker is alive"
+        end
       end
 
       def ensure_subscription
